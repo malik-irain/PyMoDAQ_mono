@@ -51,25 +51,108 @@ class Viewer2DBasic(QObject):
         self.histogram_red = pg.HistogramLUTWidget()
         self.histogram_green = pg.HistogramLUTWidget()
         self.histogram_blue = pg.HistogramLUTWidget()
+        self.histogram_adaptive = pg.HistogramLUTWidget()
         Ntick = 3
         colors_red = [(int(r), 0, 0) for r in pg.np.linspace(0, 255, Ntick)]
         colors_green = [(0, int(g), 0) for g in pg.np.linspace(0, 255, Ntick)]
         colors_blue = [(0, 0, int(b)) for b in pg.np.linspace(0, 255, Ntick)]
+        colors_adaptive = [(int(b), int(b), int(b)) for b in pg.np.linspace(0, 255, Ntick)]
         cmap_red = pg.ColorMap(pos=pg.np.linspace(0.0, 1.0, Ntick), color=colors_red)
         cmap_green = pg.ColorMap(pos=pg.np.linspace(0.0, 1.0, Ntick), color=colors_green)
         cmap_blue = pg.ColorMap(pos=pg.np.linspace(0.0, 1.0, Ntick), color=colors_blue)
+        cmap_adaptive = pg.ColorMap(pos=pg.np.linspace(0.0, 1.0, Ntick), color=colors_adaptive)
+
         self.histogram_red.gradient.setColorMap(cmap_red)
         self.histogram_green.gradient.setColorMap(cmap_green)
         self.histogram_blue.gradient.setColorMap(cmap_blue)
+        self.histogram_adaptive.gradient.setColorMap(cmap_adaptive)
         histo_layout.addWidget(self.histogram_red)
         histo_layout.addWidget(self.histogram_green)
         histo_layout.addWidget(self.histogram_blue)
-
+        histo_layout.addWidget(self.histogram_adaptive)
         hsplitter.addWidget(self.histo_widget)
+
+class PlotCurveItem(pg.PlotCurveItem):
+
+    def __init__(self, *args, **kargs):
+        super().__init__(*args, **kargs)
+        self.flipud = False
+        self.fliplr = False
+        self.flipudbis = False
+
+    def paint(self, p, opt, widget):
+        if self.xData is None or len(self.xData) == 0:
+            return
+
+        x = None
+        y = None
+        path = self.getPath()
+
+        if self._exportOpts is not False:
+            aa = self._exportOpts.get('antialias', True)
+        else:
+            aa = self.opts['antialias']
+
+        p.setRenderHint(p.Antialiasing, aa)
+
+        if self.opts['brush'] is not None and self.opts['fillLevel'] is not None:
+            if self.fillPath is None:
+                if x is None:
+                    x, y = self.getData()
+                p2 = QtGui.QPainterPath(self.path)
+                p2.lineTo(x[-1], self.opts['fillLevel'])
+                p2.lineTo(x[0], self.opts['fillLevel'])
+                p2.lineTo(x[0], y[0])
+                p2.closeSubpath()
+                self.fillPath = p2
+
+            p.fillPath(self.fillPath, self.opts['brush'])
+
+        sp = pg.functions.mkPen(self.opts['shadowPen'])
+        cp = pg.functions.mkPen(self.opts['pen'])
+
+        self.setTransform(self.dataTransform())
+
+        if sp is not None and sp.style() != QtCore.Qt.NoPen:
+            p.setPen(sp)
+            p.drawPath(path)
+        p.setPen(cp)
+        p.drawPath(path)
+
+    def setOpts(self, update=True, **kargs):
+        if 'flipud' in kargs:
+            self.flipud = kargs['flipud']
+        if 'fliplr' in kargs:
+            self.fliplr = kargs['fliplr']
+        if 'flipudbis' in kargs:
+            self.flipudbis = kargs['flipudbis']
+        if update:
+            self.update()
+
+    def dataTransform(self):
+        """Return the transform that maps from this image's input array to its
+        local coordinate system.
+
+        This transform corrects for the transposition that occurs when image data
+        is interpreted in row-major order.
+        """
+        # Might eventually need to account for downsampling / clipping here
+        tr = QtGui.QTransform()
+        if self.flipudbis:
+            tr.scale(1, -1)
+        if self.flipud:
+            tr.scale(1, -1)
+        if self.fliplr:
+            tr.scale(-1, 1)
+        return tr
 
 class ImageItem(pg.ImageItem):
     def __init__(self, image=None, **kargs):
         super(ImageItem, self).__init__(image, **kargs)
+        self.flipud = False
+        self.fliplr = False
+        self.rotate90 = False
+
 
     def getHistogram(self, bins='auto', step='auto', targetImageSize=200, targetHistogramSize=500, **kwds):
         """Returns x and y arrays containing the histogram values for the current image.
@@ -118,7 +201,107 @@ class ImageItem(pg.ImageItem):
 
         return hist[1][:-1], hist[0]
 
+    def setOpts(self, update=True, **kargs):
+        if 'axisOrder' in kargs:
+            val = kargs['axisOrder']
+            if val not in ('row-major', 'col-major'):
+                raise ValueError('axisOrder must be either "row-major" or "col-major"')
+            self.axisOrder = val
+        if 'flipud' in kargs:
+            self.flipud = kargs['flipud']
 
+        if 'fliplr' in kargs:
+            self.fliplr = kargs['fliplr']
+        if 'rotate90' in kargs:
+            self.rotate90 = kargs['rotate90']
+
+        if 'lut' in kargs:
+            self.setLookupTable(kargs['lut'], update=update)
+        if 'levels' in kargs:
+            self.setLevels(kargs['levels'], update=update)
+        #if 'clipLevel' in kargs:
+            #self.setClipLevel(kargs['clipLevel'])
+        if 'opacity' in kargs:
+            self.setOpacity(kargs['opacity'])
+        if 'compositionMode' in kargs:
+            self.setCompositionMode(kargs['compositionMode'])
+        if 'border' in kargs:
+            self.setBorder(kargs['border'])
+        if 'removable' in kargs:
+            self.removable = kargs['removable']
+            self.menu = None
+        if 'autoDownsample' in kargs:
+            self.setAutoDownsample(kargs['autoDownsample'])
+        if update:
+            self.update()
+
+    def dataTransform(self):
+        """Return the transform that maps from this image's input array to its
+        local coordinate system.
+
+        This transform corrects for the transposition that occurs when image data
+        is interpreted in row-major order.
+        """
+        # Might eventually need to account for downsampling / clipping here
+        tr = QtGui.QTransform()
+        # if self.axisOrder == 'row-major':
+        #     # transpose
+        #     tr.scale(1, -1)
+        #     tr.rotate(-90)
+        if self.flipud or self.fliplr or self.rotate90:
+            if self.rotate90:
+                tr.translate(self.height() / 2, self.width() / 2)
+            else:
+                tr.translate(self.width() / 2, self.height() / 2)
+        if self.flipud:
+            tr.scale(1, -1)
+        if self.fliplr:
+            tr.scale(-1, 1)
+        if self.rotate90:
+            tr.rotate(90)
+        if self.flipud or self.fliplr or self.rotate90:
+            tr.translate(-self.width() / 2, -self.height() / 2)
+
+        return tr
+
+    def inverseDataTransform(self):
+        """Return the transform that maps from this image's local coordinate
+        system to its input array.
+
+        See dataTransform() for more information.
+        """
+        tr = QtGui.QTransform()
+        if self.axisOrder == 'row-major':
+            # transpose
+            tr.scale(1, -1)
+            tr.rotate(-90)
+        if self.flipud:
+            tr.scale(1, -1)
+        if self.fliplr:
+            tr.scale(-1, 1)
+        if self.rotate90:
+            tr.rotate(90)
+        return tr
+
+    def paint(self, p, *args):
+        if self.image is None:
+            return
+        if self.qimage is None:
+            self.render()
+            if self.qimage is None:
+                return
+
+        if self.paintMode is not None:
+            p.setCompositionMode(self.paintMode)
+
+        self.setTransform(self.dataTransform())
+
+        shape = self.image.shape[:2] if self.axisOrder == 'col-major' else self.image.shape[:2][::-1]
+        p.drawImage(QtCore.QRectF(0, 0, self.qimage.width(), self.qimage.height()), self.qimage)
+
+        if self.border is not None:
+            p.setPen(self.border)
+            p.drawRect(self.boundingRect())
 
 class ImageWidget(pg.GraphicsLayoutWidget):
     """this gives a layout to add imageitems.
@@ -207,9 +390,16 @@ class AxisItem_Scaled(pg.AxisItem):
 
 
 if __name__ == '__main__':
+    from pymodaq.daq_utils.plotting.viewer2D.triangulationitem import TriangulationItem
+
     app = QtWidgets.QApplication(sys.argv)
     form = QtWidgets.QWidget()
     prog = Viewer2DBasic(form)
-
+    img = TriangulationItem()
+    prog.image_widget.plotItem.addItem(img)
     form.show()
+
+    data = np.load('triangulation_data.npy')
+    img.setImage(data)
+
     sys.exit(app.exec_())
