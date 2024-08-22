@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 from qtpy import QtWidgets
 
-from pymodaq.utils.plotting.data_viewers.viewer2D_basic import Viewer2DBasic
-from pymodaq.utils.plotting import scan_selector as select
+from pymodaq_gui.plotting.data_viewers.viewer2D_basic import Viewer2DBasic
+from pymodaq.utils.scanner import scan_selector as select
 
 
 def init_viewer(qtbot) -> Viewer2DBasic:
