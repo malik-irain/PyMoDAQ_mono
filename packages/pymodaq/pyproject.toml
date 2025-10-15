@@ -86,9 +86,13 @@ Homepage = "http://pymodaq.cnrs.fr"
 Source = "https://github.com/PyMoDAQ/PyMoDAQ"
 Tracker = "https://github.com/PyMoDAQ/PyMoDAQ/issues"
 
+[tool.hatch.version.raw-options]
+search_parent_directories = true
+
 [tool.hatch.version]
 source = "vcs"
-fallback-version = '5.0.1'
+fallback-version = '5.1.0'
+tag-pattern = "^pymodaq_(?P<version>\\d+\\.\\d+\\.\\d+)"
 
 [tool.hatch.build.targets.sdist]
 include = [
