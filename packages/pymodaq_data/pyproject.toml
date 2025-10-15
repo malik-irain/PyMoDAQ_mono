@@ -64,7 +64,7 @@ Tracker = "https://github.com/PyMoDAQ/PyMoDAQ/issues"
 [tool.hatch.version.raw-options]
 search_parent_directories = true
 fallback_version = "5.1.0"
-git_describe_command = "git tag --list 'pymodaq_data_*' --sort=-v:refname | head -n1"
+git_describe_command = "sh -c \"tag=$(git tag --list 'pymodaq_data_[0-9]*' --sort=-v:refname | head -n1) && git describe --tags --long --match \\\"$tag\\\" --first-parent HEAD\""
 
 [tool.hatch.version]
 source = "vcs"
