@@ -1,4 +1,4 @@
-name: tests
+name: Test for pymodaq_data
 
 on:
   workflow_call:
