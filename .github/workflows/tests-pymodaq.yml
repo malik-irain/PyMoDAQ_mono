@@ -1,6 +1,8 @@
-name: Test for pymodaq
+name: Tests for pymodaq
+
 
 on:
+  workflow_dispatch:
   workflow_call:
 
   pull_request:
@@ -22,6 +24,9 @@ concurrency:
 
 jobs:
   tests:
+    defaults:
+      run:
+        working-directory: ./packages/pymodaq
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -30,23 +35,19 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
         qt-backend: ["pyqt5", "pyqt6", "pyside6"]
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: packages/pymodaq
     env:
       DISPLAY: ':99'
       QT_DEBUG_PLUGINS: 1
 
     steps:
-      # Get the branch name for the badge generation
+      - name: Checkout the repo
+        uses: actions/checkout@v4.2.2
+
       - name: Extract branch name
         shell: bash
         run: echo "branch=${GITHUB_REF#refs/heads/}" >> "${GITHUB_OUTPUT}"
         id: extract_branch
 
-
-      - name: Checkout the repo
-        uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5.4.0
@@ -55,8 +56,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          git fetch --prune --unshallow
-          git fetch --depth=1 origin +refs/tags/*:refs/tags/*
           python -m pip install --upgrade pip
           pip install flake8 pytest pytest-cov pytest-qt pytest-xvfb pytest-xdist setuptools wheel numpy h5py ${{ matrix.qt-backend }}
           pip install -e .
@@ -81,21 +80,21 @@ jobs:
       - name: Tests with ${{ matrix.os }} ${{ matrix.python-version }} ${{ matrix.qt-backend}}
         id: tests
         run: |
-          mkdir coverage
+          mkdir -p ${{ github.workspace }}/coverage
           pytest -vv --cov=pymodaq -n 1
-          mv .coverage coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
+          mv .coverage ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4.6.1
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.python-version }}_${{ matrix.qt-backend }}
-          path: coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
+          path: ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
 
 
 
       - name: Create destination directory
         if: ${{ always() }}
         run: |
-          mkdir -p "${{ steps.extract_branch.outputs.branch }}"
+          mkdir -p "${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}"
 
       - name: generate badge (success)
         if: ${{ success() }}
@@ -104,7 +103,7 @@ jobs:
           label: ''
           status: 'passing'
           color: 'green'
-          path: '${{ steps.extract_branch.outputs.branch }}/tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
       - name: generate badge (fail)
         if: ${{ failure() }}
         uses: emibcn/badge-action@v2.0.3
@@ -112,7 +111,7 @@ jobs:
           label: ''
           status: 'failing'
           color: 'red'
-          path: '${{ steps.extract_branch.outputs.branch }}/tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
 
 
       - name: Upload badge artifact
@@ -120,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@v4.6.1
         with:
           name:  tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}
-          path: '${{ steps.extract_branch.outputs.branch }}/tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_pymodaq_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
           if-no-files-found: error
 
     outputs:

@@ -1,6 +1,7 @@
 name: Test for pymodaq_data
 
 on:
+  workflow_dispatch:
   workflow_call:
   
   pull_request:
@@ -113,11 +114,8 @@ jobs:
       branch: ${{ steps.extract_branch.outputs.branch }}
      
   badge-update:
-    if: github.repository == 'PyMoDAQ/pymodaq_data' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/pymodaq_data
     needs: tests # Ensure this job runs after all matrix jobs complete
     steps:
        # switch to badges branches to commit
@@ -134,14 +132,14 @@ jobs:
           rm -rf $(git ls-files ${{ needs.tests.outputs.branch }}/*) || true
           git rm $(git ls-files ${{ needs.tests.outputs.branch }}/*) || true
 
-          mkdir -p '${{ needs.tests.outputs.branch }}'
-          mv tests_*/*.svg '${{ needs.tests.outputs.branch }}'
+          mkdir -p 'pymodaq_utils/${{ needs.tests.outputs.branch }}'
+          mv tests_*/*.svg 'pymodaq_utils/${{ needs.tests.outputs.branch }}/'
       - name: Commit badges
         continue-on-error: true
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add ${{ needs.tests.outputs.branch }}
+          git add pymodaq_utils/
           git commit  --allow-empty -m "Add/Update badge"
 
       - name: Push badges

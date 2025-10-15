@@ -1,6 +1,7 @@
 name: Test for pymodaq_gui
 
 on:
+  workflow_dispatch:
   workflow_call:
   
   pull_request:
@@ -129,7 +130,7 @@ jobs:
       branch: ${{ steps.extract_branch.outputs.branch }}
      
   badge-update:
-    if: github.repository == 'PyMoDAQ/pymodaq_gui' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     defaults:
       run:
