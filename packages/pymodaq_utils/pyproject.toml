@@ -62,12 +62,11 @@ Tracker = "https://github.com/PyMoDAQ/pymodaq_utils/issues"
 [tool.hatch.version.raw-options]
 search_parent_directories = true
 fallback_version = "5.1.0"
-git_describe_command = "sh -c \"tag=$(git tag --list 'pymodaq_utils_[0-9]*' --sort=-v:refname | head -n1) && git describe --tags --long --match \\\"$tag\\\" --first-parent HEAD\""
+git_describe_command = '''sh -c '(git describe --contains --tags $(git rev-list -1 HEAD -- packages/pymodaq_utils) || git describe --tags $(git rev-list -1 HEAD -- packages/pymodaq_utils)) | cut -d"~" -f1 ' '''
+
 
 [tool.hatch.version]
 source = "vcs"
-fallback-version = '5.1.0'
-tag-pattern = "^pymodaq_utils_(?P<version>\\d+\\.\\d+\\.\\d+)"
 
 [tool.hatch.build.targets.sdist]
 include = [

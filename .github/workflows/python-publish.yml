@@ -22,22 +22,18 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install hatch hatchling
-    - name: Get history and tags for SCM versioning to work
-      run: |
-        git branch
-        git fetch --prune --unshallow
-        git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-
-        # get the tag with everythin lowercase
-        tag=$(echo github.event.release.tag_name | tr '[:upper:]' '[:lower:]')
-        package_name=$(echo "${tag}" | sed 's/_[^_]*$//')
-        cd packages/${package_name}
-        hatch version
-    - name: Build
-      run: hatch build
-    - name: publish
+    - name: Build and publish
       env:
         HATCH_INDEX_USER: ${{ secrets.PYPI_USERNAME }}
         HATCH_INDEX_AUTH: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        hatch publish
+        git fetch --unshallow --tags
+        last_tag=$(git tag --sort=-creatordate | head -n 1) 
+        for package in pymodaq_utils pymodaq_data pymodaq_gui pymodaq; do
+          cd packages/${package}
+          current_version=$(hatch version)
+          if [[ "${current_version}" == "${last_tag}" ]]; then
+            hatch build && hatch publish || true # Continue even if one build/publish fails
+          fi;
+          cd ../../
+        done
