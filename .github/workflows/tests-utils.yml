@@ -6,10 +6,10 @@ on:
   
   pull_request:
     paths:
-      - 'packages/pymoda_utils/**'
+      - 'packages/pymodaq_utils/**'
   push:
     paths:
-      - 'packages/pymoda_utils/**'
+      - 'packages/pymodaq_utils/**'
     branches:
     - '*'
     - '!badges' # to exclude execution if someone pushes on this branch (shouldn't happen)
@@ -20,12 +20,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   # Cancel in-progress runs when a new workflow with the same group name is triggered
   cancel-in-progress: true
-
+  
 jobs:
   tests:
-    defaults:
-      run:
-        working-directory: ./packages/pymodaq_utils  
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -33,57 +30,65 @@ jobs:
         os: ["ubuntu-latest", "windows-latest"]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/pymodaq_utils
     steps:
 
+      # As we work on packages/<package> checkout needs to be first
+      # to ensure folder existence
       - name: Checkout the repo
         uses: actions/checkout@v5.0.0
-      
+        with:
+          fetch-depth: 0
+ 
       # Get the branch name for the badge generation
       - name: Extract branch name
         shell: bash
         run: echo "branch=${GITHUB_REF#refs/heads/}" >> "${GITHUB_OUTPUT}"
         id: extract_branch
-        
 
+      - name: Create badge destination directory
+        run: |
+          mkdir -p "${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}"
+          echo  ${{ github.workspace }}
+       
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6.0.0
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest pytest-cov pytest-xdist wheel numpy h5py
           pip install -e .    
       
-      # Create folder and set permissions on Ubuntu
-      - name: Create local pymodaq folder (Ubuntu)
+      # Create folder and set permissions on Linux
+      - name: Create global pymodaq folder (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo mkdir -p /etc/.pymodaq
           sudo chmod uo+rw /etc/.pymodaq
-
+  
       - name: Linting with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=docs
+  
       - name: Tests with ${{ matrix.os }} ${{ matrix.python-version }}
         id: tests
         run: |
-          mkdir "${{ github.workspace }}/coverage"
+          mkdir  ${{ github.workspace }}/coverage
           pytest --cov=pymodaq_utils --ignore-glob='*legacy*' -n 1
-          mv .coverage ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
+          mv .coverage  ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
+
+
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4.6.2
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
-
-
-     
-      - name: Create destination directory
-        if: ${{ always() }}
-        run: |
-          mkdir -p "${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}"
 
       - name: generate badge (success)
         if: ${{ success() }}
@@ -110,12 +115,14 @@ jobs:
           name:  tests_utils_${{runner.os}}_${{matrix.python-version}}
           path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_utils_${{runner.os}}_${{matrix.python-version}}.svg'
           if-no-files-found: error 
+
+  
     
     outputs:
       branch: ${{ steps.extract_branch.outputs.branch }}
      
   badge-update:
-    #if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+   # if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     needs: tests # Ensure this job runs after all matrix jobs complete
     steps:
@@ -129,18 +136,19 @@ jobs:
 
       - name: Reorganize badges
         run: |
+          ls
           rm -rf coverage* || true
           rm -rf $(git ls-files ${{ needs.tests.outputs.branch }}/*) || true
           git rm $(git ls-files ${{ needs.tests.outputs.branch }}/*) || true
 
-          mkdir -p '${{ needs.tests.outputs.branch }}'
-          mv tests_*/*.svg '${{ needs.tests.outputs.branch }}'
+          mkdir -p 'pymodaq_utils/${{ needs.tests.outputs.branch }}'
+          mv tests_*/*.svg 'pymodaq_utils/${{ needs.tests.outputs.branch }}/'
       - name: Commit badges
         continue-on-error: true
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add ${{ needs.tests.outputs.branch }}
+          git add pymodaq_utils/
           git commit  --allow-empty -m "Add/Update badge"
 
       - name: Push badges
@@ -171,7 +179,6 @@ jobs:
           done;
           rmdir --ignore-fail-on-non-empty * || true
           cd ..
-      # We only combine linux reports otherwise the tool complains about windows directories ...
       - name: Combine coverage reports
         run: |
           python -m pip install coverage

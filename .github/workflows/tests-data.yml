@@ -33,56 +33,62 @@ jobs:
     defaults:
       run:
         working-directory: packages/pymodaq_data
-    steps:     
+    steps:
+
+      # As we work on packages/<package> checkout needs to be first
+      # to ensure folder existence
+      - name: Checkout the repo
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 0
+ 
       # Get the branch name for the badge generation
       - name: Extract branch name
         shell: bash
         run: echo "branch=${GITHUB_REF#refs/heads/}" >> "${GITHUB_OUTPUT}"
         id: extract_branch
-        
 
-      - name: Checkout the repo
-        uses: actions/checkout@v5.0.0
- 
+      - name: Create badge destination directory
+        run: |
+          mkdir -p "${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}"
+          echo  ${{ github.workspace }}
+       
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6.0.0
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest pytest-cov pytest-xdist wheel numpy h5py
           pip install -e .    
       
-      # Create folder and set permissions on Ubuntu
-      - name: Create local pymodaq folder (Ubuntu)
+      # Create folder and set permissions on Linux
+      - name: Create global pymodaq folder (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo mkdir -p /etc/.pymodaq
           sudo chmod uo+rw /etc/.pymodaq
-
+  
       - name: Linting with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=docs
+  
       - name: Tests with ${{ matrix.os }} ${{ matrix.python-version }}
         id: tests
         run: |
-          mkdir coverage
+          mkdir  ${{ github.workspace }}/coverage
           pytest --cov=pymodaq_data -n 1
-          mv .coverage coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
+          mv .coverage  ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
+
+
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4.6.2
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.python-version }}
-          path: coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
-
-
-     
-      - name: Create destination directory
-        if: ${{ always() }}
-        run: |
-          mkdir -p "${{ steps.extract_branch.outputs.branch }}"
+          path: ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}
 
       - name: generate badge (success)
         if: ${{ success() }}
@@ -91,7 +97,7 @@ jobs:
           label: ''
           status: 'passing'
           color: 'green'
-          path: '${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
       - name: generate badge (fail)
         if: ${{ failure() }}
         uses: emibcn/badge-action@v2.0.3
@@ -99,7 +105,7 @@ jobs:
           label: ''
           status: 'failing'
           color: 'red'
-          path: '${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
 
 
       - name: Upload badge artifact
@@ -107,14 +113,16 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name:  tests_data_${{runner.os}}_${{matrix.python-version}}
-          path: '${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
           if-no-files-found: error 
+
+  
     
     outputs:
       branch: ${{ steps.extract_branch.outputs.branch }}
      
   badge-update:
-    if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+   # if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     needs: tests # Ensure this job runs after all matrix jobs complete
     steps:
@@ -128,18 +136,19 @@ jobs:
 
       - name: Reorganize badges
         run: |
+          ls
           rm -rf coverage* || true
           rm -rf $(git ls-files ${{ needs.tests.outputs.branch }}/*) || true
           git rm $(git ls-files ${{ needs.tests.outputs.branch }}/*) || true
 
-          mkdir -p 'pymodaq_utils/${{ needs.tests.outputs.branch }}'
-          mv tests_*/*.svg 'pymodaq_utils/${{ needs.tests.outputs.branch }}/'
+          mkdir -p 'pymodaq_data/${{ needs.tests.outputs.branch }}'
+          mv tests_*/*.svg 'pymodaq_data/${{ needs.tests.outputs.branch }}/'
       - name: Commit badges
         continue-on-error: true
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add pymodaq_utils/
+          git add pymodaq_data/
           git commit  --allow-empty -m "Add/Update badge"
 
       - name: Push badges
@@ -170,7 +179,6 @@ jobs:
           done;
           rmdir --ignore-fail-on-non-empty * || true
           cd ..
-      # We only combine linux reports otherwise the tool complains about windows directories ...
       - name: Combine coverage reports
         run: |
           python -m pip install coverage
