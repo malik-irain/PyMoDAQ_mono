@@ -97,7 +97,7 @@ jobs:
           label: ''
           status: 'passing'
           color: 'green'
-          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_${{runner.os}}_${{matrix.python-version}}.svg'
       - name: generate badge (fail)
         if: ${{ failure() }}
         uses: emibcn/badge-action@v2.0.3
@@ -105,15 +105,15 @@ jobs:
           label: ''
           status: 'failing'
           color: 'red'
-          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_${{runner.os}}_${{matrix.python-version}}.svg'
 
 
       - name: Upload badge artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v4.6.2
         with:
-          name:  tests_data_${{runner.os}}_${{matrix.python-version}}
-          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_data_${{runner.os}}_${{matrix.python-version}}.svg'
+          name:  tests_${{runner.os}}_${{matrix.python-version}}
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_${{runner.os}}_${{matrix.python-version}}.svg'
           if-no-files-found: error 
 
   

@@ -99,16 +99,19 @@ jobs:
 
       - name: Tests with ${{ matrix.os }} ${{ matrix.python-version }} ${{ matrix.qt-backend}}
         id: tests
+        shell: bash
         run: |
-          mkdir ${{ github.workspace }}/coverage
-          if [ "${{ runner.os }}" == "Linux" ]; then
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
             export QT_DEBUG_PLUGINS=1
             export QT_OPENGL=software
             export QT_QPA_PLATFORM=offscreen
             export LIBGL_ALWAYS_SOFTWARE=1
             export MESA_LOADER_DRIVER_OVERRIDE=softpipe
             export QT_XCB_GL_INTEGRATION=none 
+            
+            mkdir ${{ github.workspace }}/coverage
             xvfb-run --server-args='-screen 0 1024x768x24' python -m pytest -vv --cov=pymodaq_gui
+            mv .coverage ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
           else
             set DEBUG_PLUGINS=1
             set OPENGL=software
@@ -117,9 +120,11 @@ jobs:
             set A_LOADER_DRIVER_OVERRIDE=softpipe
             set QT_XCB_GL_INTEGRATION=none 
             
+            workspace=$(echo "${{ github.workspace }}" | tr '\\' '/')
+            mkdir ${workspace}/coverage
             pytest -vv --cov=pymodaq_gui
+            mv .coverage ${workspace}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
           fi
-          mv .coverage ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4.6.2
@@ -141,7 +146,7 @@ jobs:
           label: ''
           status: 'passing'
           color: 'green'
-          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_gui_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
 
       - name: generate badge (fail)
         if: ${{ failure() }}
@@ -150,15 +155,15 @@ jobs:
           label: ''
           status: 'failing'
           color: 'red'
-          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_gui_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
 
 
       - name: Upload badge artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v4.6.2
         with:
-          name:  tests_gui_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}
-          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_gui_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
+          name:  tests_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}
+          path: '${{ github.workspace }}/${{ steps.extract_branch.outputs.branch }}/tests_${{runner.os}}_${{matrix.python-version}}_${{matrix.qt-backend}}.svg'
           if-no-files-found: error 
     
     outputs:
