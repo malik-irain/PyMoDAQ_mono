@@ -113,11 +113,11 @@ jobs:
             xvfb-run --server-args='-screen 0 1024x768x24' python -m pytest -vv --cov=pymodaq_gui
             mv .coverage ${{ github.workspace }}/coverage/coverage_${{ matrix.os }}_${{ matrix.python-version }}_${{ matrix.qt-backend }}
           else
-            set DEBUG_PLUGINS=1
-            set OPENGL=software
-            set QPA_PLATFORM=offscreen
-            set GL_ALWAYS_SOFTWARE=1
-            set A_LOADER_DRIVER_OVERRIDE=softpipe
+            set QT_DEBUG_PLUGINS=1
+            set QT_OPENGL=software
+            set QT_QPA_PLATFORM=offscreen
+            set LIBGL_ALWAYS_SOFTWARE=1
+            set MESA_LOADER_DRIVER_OVERRIDE=softpipe
             set QT_XCB_GL_INTEGRATION=none 
             
             workspace=$(echo "${{ github.workspace }}" | tr '\\' '/')
@@ -171,7 +171,7 @@ jobs:
      
      
   badge-update:
-   # if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    if: github.repository == 'PyMoDAQ/PyMoDAQ' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
     runs-on: ubuntu-latest
     needs: tests # Ensure this job runs after all matrix jobs complete
     steps:
